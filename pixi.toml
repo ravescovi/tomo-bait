@@ -1,0 +1,16 @@
+[workspace]
+authors = ["mdecarabas <codrea.eric@gmail.com>"]
+channels = ["conda-forge"]
+name = "tomo_bait"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+numpy = ">=2.3.4,<3"
+python = ">=3.14"
+google-genai = ">=1.49.0,<2"
+
+[pypi-dependencies]
+ag2 = { version = "*", extras = ["gemini"] }
