@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Union
 
 from git import Repo
+from langchain_community.document_loaders import ReadTheDocsLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+# Make sure to: pip install langchain-google-genai chromadb
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_chroma import Chroma
 
 
 def ingest_documentation(repo_url: str, documentation_dir: Union[str, Path]):
@@ -79,6 +84,53 @@ def ingest_documentation(repo_url: str, documentation_dir: Union[str, Path]):
         print(e.stderr)
         sys.exit(1)
 
+def loader():
+
+    # Point this to the output folder from your 'make' command
+    HTML_BUILD_DIR = "./cloned_repo/docs/_build/html"
+
+    print(f"Loading docs from {HTML_BUILD_DIR}...")
+    loader = ReadTheDocsLoader(HTML_BUILD_DIR, features="html.parser")
+    docs = loader.load()
+
+    if not docs:
+        print("❌ ERROR: No documents were loaded. Check your HTML_BUILD_DIR.")
+        sys.exit(1)
+
+    print(f"✅ Loaded {len(docs)} documents.")
+
+
+def chunk_documents():
+
+    # This splitter tries to keep paragraphs/sentences together
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,  # The size of each chunk in characters
+        chunk_overlap=200   # How much chunks overlap
+    )
+
+    print("Splitting documents into chunks...")
+    splits = text_splitter.split_documents(docs)
+    print(f"✅ Split {len(docs)} docs into {len(splits)} chunks.")
+
+def embed_and_store():
+    # Define where to save the database
+    DB_PATH = "./chroma_db"
+
+    print("Initializing embedding model...")
+    # This uses your GOOGLE_API_KEY environment variable
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+
+    print(f"Creating and saving vector store at {DB_PATH}...")
+    # This is the magic command.
+    # It takes all splits, embeds them, and saves to disk.
+    vectorstore = Chroma.from_documents(
+        documents=splits,
+        embedding=embeddings,
+        persist_directory=DB_PATH
+)
+
+    print("🎉 All done!")
+    print(f"Your knowledge base is ready and saved in '{DB_PATH}'.")
 
 if __name__ == "__main__":
     REPO_URL = "https://github.com/xray-imaging/2bm-docs.git"
