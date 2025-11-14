@@ -8,7 +8,7 @@ load_dotenv()
 
 # 2. Define our LLM configuration for gemini-2.0-flash-lite
 #    uses the GEMINI_API_KEY environment variable
-llm_config = llm_config = LLMConfig(
+llm_config = LLMConfig(
     config_list={
         "api_type": "google",
         "model": "gemini-2.0-flash-lite",

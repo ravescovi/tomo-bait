@@ -126,13 +126,13 @@ def load_chunk_embed(HTML_BUILD_DIR: str):
     print("🎉 All done!")
     print(f"Your knowledge base is ready and saved in '{DB_PATH}'.")
 
-if __name__ == "__main__":
-    current_directory =  Path.cwd()
+# if __name__ == "__main__":
+#     current_directory =  Path.cwd()
 
-    REPO_URL = "https://github.com/xray-imaging/2bm-docs.git"
-    # Store documentation in a 'tomo_documentation' folder in the user's home directory
-    DOCS_DIR = current_directory / "tomo_documentation"
-    ingest_documentation(REPO_URL, DOCS_DIR)
+#     REPO_URL = "https://github.com/xray-imaging/2bm-docs.git"
+#     # Store documentation in a 'tomo_documentation' folder in the user's home directory
+#     DOCS_DIR = current_directory / "tomo_documentation"
+#     ingest_documentation(REPO_URL, DOCS_DIR)
 
-    HTML_BUILD_DIR = DOCS_DIR / "2bm-docs/docs/_build/html"
-    load_chunk_embed(HTML_BUILD_DIR)
+#     HTML_BUILD_DIR = DOCS_DIR / "2bm-docs/docs/_build/html"
+#     load_chunk_embed(HTML_BUILD_DIR)
