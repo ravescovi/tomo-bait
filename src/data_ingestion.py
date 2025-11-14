@@ -7,14 +7,13 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Union
+import os
 
 from git import Repo
 from langchain_community.document_loaders import ReadTheDocsLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-# Make sure to: pip install langchain-google-genai chromadb
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-
+from langchain_huggingface import HuggingFaceEmbeddings
 
 def ingest_documentation(repo_url: str, documentation_dir: Union[str, Path]):
     """
@@ -84,13 +83,10 @@ def ingest_documentation(repo_url: str, documentation_dir: Union[str, Path]):
         print(e.stderr)
         sys.exit(1)
 
-def loader():
-
-    # Point this to the output folder from your 'make' command
-    HTML_BUILD_DIR = "./cloned_repo/docs/_build/html"
+def load_chunk_embed(HTML_BUILD_DIR: str):
 
     print(f"Loading docs from {HTML_BUILD_DIR}...")
-    loader = ReadTheDocsLoader(HTML_BUILD_DIR, features="html.parser")
+    loader = ReadTheDocsLoader(HTML_BUILD_DIR)
     docs = loader.load()
 
     if not docs:
@@ -98,9 +94,6 @@ def loader():
         sys.exit(1)
 
     print(f"✅ Loaded {len(docs)} documents.")
-
-
-def chunk_documents():
 
     # This splitter tries to keep paragraphs/sentences together
     text_splitter = RecursiveCharacterTextSplitter(
@@ -112,14 +105,15 @@ def chunk_documents():
     splits = text_splitter.split_documents(docs)
     print(f"✅ Split {len(docs)} docs into {len(splits)} chunks.")
 
-def embed_and_store():
     # Define where to save the database
     DB_PATH = "./chroma_db"
 
-    print("Initializing embedding model...")
-    # This uses your GOOGLE_API_KEY environment variable
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    print("Initializing embedding model3...")
+    # This model will be downloaded and run 100% locally
+    model_name = "sentence-transformers/all-MiniLM-L6-v2"
+    embeddings = HuggingFaceEmbeddings(model_name=model_name)
 
+    print("✅ Using local, open-source embeddings!")
     print(f"Creating and saving vector store at {DB_PATH}...")
     # This is the magic command.
     # It takes all splits, embeds them, and saves to disk.
@@ -133,7 +127,12 @@ def embed_and_store():
     print(f"Your knowledge base is ready and saved in '{DB_PATH}'.")
 
 if __name__ == "__main__":
+    current_directory =  Path.cwd()
+
     REPO_URL = "https://github.com/xray-imaging/2bm-docs.git"
     # Store documentation in a 'tomo_documentation' folder in the user's home directory
-    DOCS_DIR = Path.home() / "tomo_documentation"
+    DOCS_DIR = current_directory / "tomo_documentation"
     ingest_documentation(REPO_URL, DOCS_DIR)
+
+    HTML_BUILD_DIR = DOCS_DIR / "2bm-docs/docs/_build/html"
+    load_chunk_embed(HTML_BUILD_DIR)
