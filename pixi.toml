@@ -4,7 +4,8 @@ platforms = ["osx-arm64"]
 
 [tasks]
 install = "pip install -e ."
-start-frontend = "PYTHONPATH=src uvicorn tomobait.frontend:app --reload --port 8000"
+start-backend = "PYTHONPATH=src uvicorn tomobait.app:api --reload --port 8001"
+start-frontend = "PYTHONPATH=src python src/tomobait/frontend.py"
 run-cli = "PYTHONPATH=src python src/tomobait/cli.py"
 lint = "ruff check ."
 format = "ruff format ."
@@ -19,7 +20,7 @@ sphinx_rtd_theme = ">=3.0.2,<4"
 sphinxcontrib-bibtex = ">=2.6.5,<3"
 nbsphinx = ">=0.9.7,<0.10"
 pybtex = ">=0.25.1,<0.26"
-ruff = ">=0.4.4,<0.5"
+ruff = "*"
 
 [pypi-dependencies]
 ag2 = { version = "*", extras = ["gemini", "mcp"] }
@@ -29,5 +30,7 @@ langchain-chroma = ">=1.0.0, <2"
 langchain-huggingface = ">=1.0.1, <2"
 langchain-text-splitters = ">=1.0.0, <2"
 google-generativeai = ">=0.8.5, <0.9"
-fastapi = ">=0.111.0, <0.112"
+fastapi = "*"
 uvicorn = ">=0.29.0, <0.30"
+gradio = "*"
+requests = "*"

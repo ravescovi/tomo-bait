@@ -1,5 +1,7 @@
 import argparse
+
 from tomobait.app import run_agent_chat
+
 
 def main():
     parser = argparse.ArgumentParser(description="TomoBait CLI")

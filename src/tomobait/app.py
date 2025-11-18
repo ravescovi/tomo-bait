@@ -1,17 +1,29 @@
 import os
+from typing import Annotated
+
 import autogen
 from autogen import LLMConfig
-from typing import Annotated
-from .retriever import get_documentation_retriever
 from dotenv import load_dotenv
+from fastapi import FastAPI
+from pydantic import BaseModel
 
-# --- FIX 1: Remove the Google-specific type imports ---
-# We will use a plain dict, so we don't need these.
-# from google.generativeai.types import Tool
-# from google.ai.generativelanguage import FunctionDeclaration, Schema, Type
-
+from .retriever import get_documentation_retriever
 
 load_dotenv()
+
+# --- FastAPI App ---
+api = FastAPI()
+
+class ChatQuery(BaseModel):
+    query: str
+
+@api.post("/chat")
+async def chat_endpoint(chat_query: ChatQuery):
+    """
+    Endpoint to receive a query and return the agent's response.
+    """
+    answer = run_agent_chat(chat_query.query)
+    return {"response": answer}
 
 # --- 1. Interchangeable LLM Config ---
 api_key = os.getenv("GEMINI_API_KEY")
@@ -19,8 +31,6 @@ if not api_key:
     print("❌ ERROR: GEMINI_API_KEY environment variable not set.")
     exit()
 
-# --- FIX 2: Define the tool as a standard Python dict (OpenAI format) ---
-# This is what the autogen wrapper expects to receive.
 query_documentation_tool_dict = {
     "type": "function",
     "function": {
@@ -39,8 +49,6 @@ query_documentation_tool_dict = {
     }
 }
 
-
-# Use the generic LLMConfig
 llm_config = LLMConfig(
     config_list=[
         {
@@ -59,7 +67,7 @@ retriever = get_documentation_retriever()
 # --- 3. Define Agents ---
 technician_agent = autogen.AssistantAgent(
     "doc_expert",
-    llm_config=llm_config,  # <-- This config now contains the tool dict
+    llm_config=llm_config,
     system_message=(
         "You are an expert on this project's documentation. "
         "A user will ask a question. Your 'query_documentation' tool "
@@ -72,14 +80,12 @@ technician_agent = autogen.AssistantAgent(
 worker_agent = autogen.UserProxyAgent(
     "tool_worker",
     llm_config=False,
+    human_input_mode="NEVER",
+    # Terminate the conversation when the other agent sends a message
+    # that doesn't contain a tool call.
+    is_termination_msg=lambda msg: not msg.get("tool_calls"),
     code_execution_config=False,
 )
-
-
-# --- 4. Define & Register the "Tool" ---
-# This part is correct:
-# - No @register_for_llm (handled by llm_config)
-# - YES @register_for_execution (so the worker can run it)
 
 @worker_agent.register_for_execution(name="query_documentation")
 def query_documentation(
@@ -103,12 +109,6 @@ def query_documentation(
 def run_agent_chat(user_question: str) -> str:
     """
     Initializes and runs a chat between agents to answer a user's question.
-
-    Args:
-        user_question: The question to be answered.
-
-    Returns:
-        The final answer from the agent chat.
     """
     print("Starting agent chat...")
     chat_result = worker_agent.initiate_chat(
@@ -118,12 +118,12 @@ def run_agent_chat(user_question: str) -> str:
             "You *must* use the 'query_documentation' tool to "
             "find the relevant context first."
         ),
-        max_turns=2
     )
 
-    # Print the final answer
-    if chat_result and chat_result.chat_history:
-        final_answer = chat_result.chat_history[-1]["content"]
+    # The summary is the last message that was sent in the chat.
+    # In our case, this is the final answer from the technician agent.
+    final_answer = chat_result.summary
+    if final_answer:
         print("\n--- FINAL ANSWER ---")
         print(final_answer)
         return final_answer
@@ -131,6 +131,5 @@ def run_agent_chat(user_question: str) -> str:
 
 
 if __name__ == '__main__':
-    # This part is for testing the refactored script directly
     USER_QUESTION = "What epics devices are connected to the beamline"
     run_agent_chat(USER_QUESTION)

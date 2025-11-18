@@ -1,4 +1,5 @@
 import sys
+
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     """
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
-        print(f"\n--- Testing Retriever ---")
+        print("\n--- Testing Retriever ---")
         print(f"Query: '{query}'")
         
         retriever = get_documentation_retriever()

@@ -7,13 +7,13 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Union
-import os
 
 from git import Repo
-from langchain_community.document_loaders import ReadTheDocsLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
+from langchain_community.document_loaders import ReadTheDocsLoader
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 def ingest_documentation(repo_url: str, documentation_dir: Union[str, Path]):
     """
