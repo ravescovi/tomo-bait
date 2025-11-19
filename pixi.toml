@@ -4,7 +4,7 @@ platforms = ["osx-arm64"]
 
 [tasks]
 install = "pip install -e ."
-start-backend = "PYTHONPATH=src uvicorn tomobait.app:api --reload --port 8001"
+start-backend = "PYTHONPATH=src uvicorn tomobait.app:api --reload --port 8002"
 start-frontend = "PYTHONPATH=src python src/tomobait/frontend.py"
 run-cli = "PYTHONPATH=src python src/tomobait/cli.py"
 lint = "ruff check ."
@@ -21,6 +21,7 @@ sphinxcontrib-bibtex = ">=2.6.5,<3"
 nbsphinx = ">=0.9.7,<0.10"
 pybtex = ">=0.25.1,<0.26"
 ruff = "*"
+pyyaml = "*"
 
 [pypi-dependencies]
 ag2 = { version = "*", extras = ["gemini", "mcp"] }

@@ -168,6 +168,8 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
@@ -213,3 +215,6 @@ __marimo__/
 
 # VScode
 .vscode/
+chroma_db/chroma.sqlite3
+tomo_documentation/2bm-docs
+chroma_db/chroma.sqlite3
