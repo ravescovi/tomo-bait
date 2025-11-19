@@ -179,6 +179,7 @@ def load_config_values():
     """
     Load current config values for the config tab.
     """
+    import yaml
     config = get_config()
 
     # Determine provider from api_type
@@ -190,6 +191,17 @@ def load_config_values():
         "anl_argo": "anl_argo"
     }
     provider = api_type_to_provider.get(config.llm.api_type, "gemini")
+
+    # Format resources as YAML for display
+    config_dict = config.model_dump()
+    resources_yaml = ""
+    if "resources" in config_dict:
+        resources_yaml = yaml.dump(
+            {"resources": config_dict["resources"]},
+            default_flow_style=False,
+            sort_keys=False,
+            indent=2
+        )
 
     return (
         "\n".join(config.documentation.git_repos),
@@ -211,6 +223,7 @@ def load_config_values():
         config.llm.anl_model or "",
         config.text_processing.chunk_size,
         config.text_processing.chunk_overlap,
+        resources_yaml,  # Resources display
     )
 
 
@@ -275,6 +288,72 @@ def save_config_values(
     save_config(config)
 
     return "Configuration saved successfully! Config will hot-reload automatically."
+
+
+def check_vectordb_status():
+    """
+    Check the status of the vector database.
+    Returns a status message indicating the number of documents.
+    """
+    try:
+        from langchain_chroma import Chroma
+        from langchain_huggingface import HuggingFaceEmbeddings
+        from .config import get_config
+
+        config = get_config()
+        embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+        vectorstore = Chroma(
+            persist_directory=config.retriever.db_path,
+            embedding_function=embeddings
+        )
+        count = vectorstore._collection.count()
+
+        if count == 0:
+            return "⚠️ Empty - No documents indexed. Please run ingestion."
+        else:
+            return f"✅ Ready - {count} documents indexed"
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+
+def run_data_ingestion():
+    """
+    Run the data ingestion process.
+    Yields progress updates as the process runs.
+    """
+    import subprocess
+    import os
+
+    yield "🔄 Starting data ingestion process...\n"
+
+    try:
+        # Run the ingestion command
+        cmd = ["/home/raf/.pixi/bin/pixi", "run", "ingest"]
+
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=os.getcwd()
+        )
+
+        output = ""
+        for line in process.stdout:
+            output += line
+            yield output
+
+        process.wait()
+
+        if process.returncode == 0:
+            # Check final status
+            status = check_vectordb_status()
+            yield output + f"\n\n✅ Ingestion completed successfully!\n{status}"
+        else:
+            yield output + f"\n\n❌ Ingestion failed with exit code {process.returncode}"
+
+    except Exception as e:
+        yield f"❌ Error running ingestion: {str(e)}"
 
 
 def update_llm_fields_from_provider(provider):
@@ -505,6 +584,37 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     label="Chunk Overlap", minimum=0, maximum=1000, step=50
                 )
 
+            with gr.Accordion("📚 Resources (APS Tomography)", open=False):
+                gr.Markdown(
+                    "This section contains links to beamlines, software packages, "
+                    "and community resources. Edit config.yaml directly to modify."
+                )
+                resources_display = gr.Code(
+                    label="Resources Configuration",
+                    language="yaml",
+                    interactive=False,
+                    lines=20,
+                )
+
+            with gr.Accordion("🔄 Data Ingestion", open=True):
+                gr.Markdown(
+                    "Ingest documentation into the vector database. "
+                    "Run this after changing documentation sources or to refresh the index."
+                )
+                with gr.Row():
+                    ingest_status_display = gr.Textbox(
+                        label="Vector Database Status",
+                        value="Checking...",
+                        interactive=False,
+                    )
+                ingest_btn = gr.Button("🚀 Run Data Ingestion", variant="secondary")
+                ingest_output = gr.Textbox(
+                    label="Ingestion Log",
+                    interactive=False,
+                    lines=10,
+                    placeholder="Ingestion output will appear here...",
+                )
+
             save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
             config_status = gr.Textbox(label="Status", interactive=False)
 
@@ -539,6 +649,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     anl_model,
                     chunk_size,
                     chunk_overlap,
+                    resources_display,
                 ],
             )
 
@@ -567,6 +678,24 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     chunk_overlap,
                 ],
                 config_status,
+            )
+
+            # Connect ingestion button
+            ingest_btn.click(
+                run_data_ingestion,
+                None,
+                ingest_output
+            ).then(
+                check_vectordb_status,
+                None,
+                ingest_status_display
+            )
+
+            # Load initial ingestion status
+            demo.load(
+                check_vectordb_status,
+                None,
+                ingest_status_display
             )
 
         # --- Tab 4: Setup (AI Config Generator) ---

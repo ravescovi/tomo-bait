@@ -9,7 +9,7 @@ start-frontend = "PYTHONPATH=src python -m tomobait.frontend"
 run-cli = "PYTHONPATH=src python src/tomobait/cli.py"
 lint = "ruff check ."
 format = "ruff format ."
-ingest = "python src/data_ingestion.py"
+ingest = "PYTHONPATH=src python -m tomobait.data_ingestion"
 
 [dependencies]
 python = ">=3.12,<3.13"

@@ -3,7 +3,7 @@ documentation:
   - https://github.com/xray-imaging/2bm-docs.git
   local_folders: []
   docs_output_dir: tomo_documentation
-  sphinx_build_html_path: tomo_documentation/2bm-docs/docs/_build/html
+  sphinx_build_html_path: tomo_documentation/2bm-docs/docs/_build
 
 retriever:
   db_path: ./chroma_db
