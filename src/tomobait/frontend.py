@@ -635,6 +635,107 @@ def run_data_ingestion():
         yield f"❌ Error running ingestion: {str(e)}"
 
 
+def get_sources_summary():
+    """
+    Get a summary of all configured sources and their status.
+    Returns formatted markdown string with statistics.
+    """
+    config = get_config()
+
+    # Count sources
+    git_repo_count = len(config.documentation.git_repos)
+    local_folder_count = len(config.documentation.local_folders)
+
+    # Count resources
+    resource_count = 0
+    if hasattr(config, 'resources'):
+        config_dict = config.model_dump()
+        resources = config_dict.get('resources', {})
+        for category, items in resources.items():
+            if isinstance(items, dict):
+                resource_count += len(items)
+            elif isinstance(items, list):
+                resource_count += len(items)
+
+    # Get vector DB status
+    try:
+        from langchain_chroma import Chroma
+        from langchain_huggingface import HuggingFaceEmbeddings
+
+        embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+        vectorstore = Chroma(
+            persist_directory=config.retriever.db_path,
+            embedding_function=embeddings
+        )
+        doc_count = vectorstore._collection.count()
+        db_status = f"✅ {doc_count} documents"
+    except Exception as e:
+        doc_count = 0
+        db_status = "❌ Not available"
+
+    # Format summary
+    summary = f"""
+### 📊 Sources Overview
+
+**Documentation Sources:**
+- 📦 Git Repositories: {git_repo_count}
+- 📁 Local Folders: {local_folder_count}
+- 📖 Resource Entries: {resource_count}
+
+**Vector Database:**
+- Status: {db_status}
+- Location: `{config.retriever.db_path}`
+
+**Total Sources Configured:** {git_repo_count + local_folder_count + resource_count}
+"""
+    return summary
+
+
+def get_source_statuses():
+    """
+    Get detailed status for each configured source.
+    Returns a formatted string with per-source status indicators.
+    """
+    config = get_config()
+    statuses = []
+
+    # Check git repos
+    for repo_url in config.documentation.git_repos:
+        repo_name = repo_url.split('/')[-1].replace('.git', '')
+        repo_path = Path(config.documentation.docs_output_dir) / repo_name
+
+        if repo_path.exists():
+            build_path = Path(config.documentation.sphinx_build_html_path)
+            if build_path.exists():
+                statuses.append(f"✅ {repo_url} (cloned & built)")
+            else:
+                statuses.append(f"⚠️ {repo_url} (cloned, not built)")
+        else:
+            statuses.append(f"❌ {repo_url} (not cloned)")
+
+    # Check local folders
+    for folder_path in config.documentation.local_folders:
+        folder = Path(folder_path)
+        if folder.exists() and folder.is_dir():
+            statuses.append(f"✅ {folder_path} (found)")
+        else:
+            statuses.append(f"❌ {folder_path} (not found)")
+
+    # Check resources
+    try:
+        config_dict = config.model_dump()
+        if 'resources' in config_dict:
+            resource_categories = len(config_dict['resources'])
+            statuses.append(f"✅ Resources ({resource_categories} categories configured)")
+    except:
+        statuses.append("⚠️ Resources (could not verify)")
+
+    if not statuses:
+        return "No sources configured"
+
+    return "\n".join(statuses)
+
+
 def update_llm_fields_from_provider(provider):
     """
     Update LLM-related fields based on selected provider.
@@ -795,23 +896,50 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                 "Manage documentation sources and run ingestion to update the vector database."
             )
 
+            # Summary Panel
+            sources_summary = gr.Markdown(value="Loading sources overview...")
+
+            with gr.Row():
+                summary_refresh_btn = gr.Button("🔄 Refresh Overview", size="sm", variant="secondary")
+
             with gr.Accordion("📚 Documentation Sources", open=True):
+                gr.Markdown(
+                    "*Configure where documentation should be loaded from. Git repositories will be "
+                    "automatically cloned and built. Local folders should point to pre-built HTML documentation.*"
+                )
+
                 with gr.Row():
-                    gr.Markdown("### Documentation Sources Configuration")
-                    sources_refresh_btn = gr.Button("🔄 Refresh", size="sm", variant="secondary")
+                    sources_refresh_btn = gr.Button("🔄 Refresh Values", size="sm", variant="secondary")
 
                 sources_git_repos = gr.Textbox(
                     label="Git Repositories (one per line)",
                     lines=3,
-                    placeholder="https://github.com/user/repo.git",
+                    placeholder="https://github.com/xray-imaging/2bm-docs.git",
+                    info="Repository URLs will be cloned to the documentation output directory"
                 )
                 sources_local_folders = gr.Textbox(
                     label="Local Folders (one per line)",
                     lines=3,
-                    placeholder="/path/to/docs",
+                    placeholder="/path/to/built/docs",
+                    info="Paths to pre-built HTML documentation directories"
                 )
-                sources_docs_output = gr.Textbox(label="Documentation Output Directory")
-                sources_sphinx_html = gr.Textbox(label="Sphinx HTML Build Path")
+                sources_docs_output = gr.Textbox(
+                    label="Documentation Output Directory",
+                    info="Where cloned git repositories will be stored"
+                )
+                sources_sphinx_html = gr.Textbox(
+                    label="Sphinx HTML Build Path",
+                    info="Path to built Sphinx HTML files that will be indexed"
+                )
+
+                # Source Status Display
+                gr.Markdown("### 📊 Source Status")
+                sources_status_display = gr.Textbox(
+                    label="Per-Source Status",
+                    lines=5,
+                    interactive=False,
+                    value="Loading status..."
+                )
 
             with gr.Accordion("🔄 Vector Database & Ingestion", open=True):
                 sources_ingest_status = gr.Textbox(
@@ -858,6 +986,19 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                 ],
             )
 
+            # Load initial summary and status
+            demo.load(
+                get_sources_summary,
+                None,
+                sources_summary
+            )
+
+            demo.load(
+                get_source_statuses,
+                None,
+                sources_status_display
+            )
+
             # Load initial ingestion status
             demo.load(
                 check_vectordb_status,
@@ -865,7 +1006,18 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                 sources_ingest_status
             )
 
-            # Connect refresh button
+            # Connect summary refresh button
+            summary_refresh_btn.click(
+                get_sources_summary,
+                None,
+                sources_summary
+            ).then(
+                get_source_statuses,
+                None,
+                sources_status_display
+            )
+
+            # Connect source values refresh button
             sources_refresh_btn.click(
                 load_sources_values,
                 None,
@@ -876,6 +1028,10 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     sources_sphinx_html,
                     sources_resources_display,
                 ],
+            ).then(
+                get_source_statuses,
+                None,
+                sources_status_display
             )
 
             # Connect save sources button
@@ -899,6 +1055,14 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                 check_vectordb_status,
                 None,
                 sources_ingest_status
+            ).then(
+                get_sources_summary,
+                None,
+                sources_summary
+            ).then(
+                get_source_statuses,
+                None,
+                sources_status_display
             )
 
         # --- Tab 4: Configuration ---
