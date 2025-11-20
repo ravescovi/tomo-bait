@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Annotated
 
 import autogen
@@ -38,8 +39,28 @@ async def chat_endpoint(chat_query: ChatQuery):
     """
     Endpoint to receive a query and return the agent's response.
     """
-    answer = run_agent_chat(chat_query.query)
-    return {"response": answer}
+    try:
+        answer = run_agent_chat(chat_query.query)
+        return {"response": answer}
+    except Exception as e:
+        error_msg = str(e)
+        # Check if it's an API overload error
+        if "503" in error_msg or "overloaded" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="The AI service is currently overloaded. Please try again in a moment."
+            )
+        elif "429" in error_msg or "rate limit" in error_msg.lower():
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded. Please wait a moment before trying again."
+            )
+        else:
+            # Generic error
+            raise HTTPException(
+                status_code=500,
+                detail=f"An error occurred while processing your request: {error_msg}"
+            )
 
 @api.get("/config")
 async def get_config_endpoint():
@@ -221,30 +242,59 @@ def query_documentation(
     print(f"--- TOOL: Found {len(results)} chunks. ---")
     return context_str
 
-def run_agent_chat(user_question: str) -> str:
+def run_agent_chat(user_question: str, max_retries: int = 3) -> str:
     """
     Initializes and runs a chat between agents to answer a user's question.
+    Includes retry logic with exponential backoff for API errors.
+
+    Args:
+        user_question: The user's query
+        max_retries: Maximum number of retry attempts (default: 3)
+
+    Returns:
+        The agent's final answer
     """
     print("Starting agent chat...")
-    chat_result = worker_agent.initiate_chat(
-        recipient=technician_agent,
-        message=(
-            f"Please answer this question: '{user_question}'. "
-            "You *must* use the 'query_documentation' tool to find the relevant context first. "
-            "Provide a concise but complete answer (2-3 paragraphs). "
-            "If the question asks 'how to' do something, provide step-by-step instructions as a numbered list. "
-            "Include relevant source links from the context at the end of your response."
-        ),
-    )
 
-    # The summary is the last message that was sent in the chat.
-    # In our case, this is the final answer from the technician agent.
-    final_answer = chat_result.summary
-    if final_answer:
-        print("\n--- FINAL ANSWER ---")
-        print(final_answer)
-        return final_answer
-    return "Sorry, I couldn't find an answer."
+    for attempt in range(max_retries):
+        try:
+            chat_result = worker_agent.initiate_chat(
+                recipient=technician_agent,
+                message=(
+                    f"Please answer this question: '{user_question}'. "
+                    "You *must* use the 'query_documentation' tool to find the relevant context first. "
+                    "Provide a concise but complete answer (2-3 paragraphs). "
+                    "If the question asks 'how to' do something, provide step-by-step instructions as a numbered list. "
+                    "Include relevant source links from the context at the end of your response."
+                ),
+            )
+
+            # The summary is the last message that was sent in the chat.
+            # In our case, this is the final answer from the technician agent.
+            final_answer = chat_result.summary
+            if final_answer:
+                print("\n--- FINAL ANSWER ---")
+                print(final_answer)
+                return final_answer
+            return "Sorry, I couldn't find an answer."
+
+        except Exception as e:
+            error_msg = str(e)
+            is_retryable = ("503" in error_msg or "overloaded" in error_msg.lower() or
+                          "429" in error_msg or "rate limit" in error_msg.lower())
+
+            if is_retryable and attempt < max_retries - 1:
+                # Exponential backoff: 2^attempt seconds
+                wait_time = 2 ** attempt
+                print(f"⚠️  API error (attempt {attempt + 1}/{max_retries}). Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+            else:
+                # Not retryable or out of retries
+                print(f"❌ Error after {attempt + 1} attempts: {error_msg}")
+                raise
+
+    return "Sorry, I couldn't process your request after multiple attempts."
 
 
 # --- Startup Event: Initialize Config Watcher ---
