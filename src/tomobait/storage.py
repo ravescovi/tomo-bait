@@ -104,9 +104,22 @@ class Conversation(BaseModel):
 class ConversationStorage:
     """Manage conversation persistence using JSON files."""
 
-    def __init__(self, storage_dir: str = "conversations"):
-        self.storage_dir = Path(storage_dir)
-        self.storage_dir.mkdir(exist_ok=True)
+    def __init__(self, storage_dir: Optional[str] = None):
+        """
+        Initialize conversation storage.
+
+        Args:
+            storage_dir: Path to storage directory. If None, will use config.
+        """
+        if storage_dir is None:
+            # Import here to avoid circular dependency
+            from .config import get_config
+            config = get_config()
+            self.storage_dir = config.get_conversations_dir()
+        else:
+            self.storage_dir = Path(storage_dir)
+
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def save(self, conversation: Conversation) -> str:
         """Save a conversation to a JSON file. Returns conversation ID."""

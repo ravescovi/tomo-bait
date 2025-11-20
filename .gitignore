@@ -217,5 +217,10 @@ __marimo__/
 .vscode/
 
 # Project-specific ignores
+# Data directories for each bait project
+.bait-*/
+
+# Old data directories (deprecated)
 chroma_db/
-tomo_documentation/2bm-docs
+tomo_documentation/
+conversations/

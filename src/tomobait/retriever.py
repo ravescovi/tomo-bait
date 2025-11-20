@@ -16,10 +16,11 @@ def get_documentation_retriever():
     # Initialize the same embedding model
     embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
 
-    print(f"Connecting to vector store at: {config.retriever.db_path}")
+    db_path = str(config.get_db_path())
+    print(f"Connecting to vector store at: {db_path}")
     # Connect to the existing, persisted database
     vectorstore = Chroma(
-        persist_directory=config.retriever.db_path,
+        persist_directory=db_path,
         embedding_function=embeddings
     )
 

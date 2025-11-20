@@ -116,17 +116,18 @@ def load_chunk_embed(HTML_BUILD_DIR: str):
     embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
 
     print("✅ Using local, open-source embeddings!")
-    print(f"Creating and saving vector store at {config.retriever.db_path}...")
+    db_path = str(config.get_db_path())
+    print(f"Creating and saving vector store at {db_path}...")
     # This is the magic command.
     # It takes all splits, embeds them, and saves to disk.
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
-        persist_directory=config.retriever.db_path
+        persist_directory=db_path
     )
 
     print("🎉 All done!")
-    print(f"Your knowledge base is ready and saved in '{config.retriever.db_path}'.")
+    print(f"Your knowledge base is ready and saved in '{db_path}'.")
 
 
 def create_resource_documents() -> List[Document]:
@@ -136,9 +137,8 @@ def create_resource_documents() -> List[Document]:
     """
     documents = []
 
-    # Get resources from config
-    config_dict = config.model_dump()
-    resources = config_dict.get("resources", {})
+    # Get resources from config.documentation.resources
+    resources = config.documentation.resources or {}
 
     if not resources:
         print("⚠️  No resources found in config.yaml")
@@ -288,14 +288,15 @@ def embed_resources():
     embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
 
     # Load existing vectorstore or create new one
-    print(f"Adding resource documents to vector store at {config.retriever.db_path}...")
+    db_path = config.get_db_path()
+    db_path_str = str(db_path)
+    print(f"Adding resource documents to vector store at {db_path_str}...")
 
     # Check if vectorstore exists
-    db_path = Path(config.retriever.db_path)
     if db_path.exists():
         # Add to existing vectorstore
         vectorstore = Chroma(
-            persist_directory=config.retriever.db_path,
+            persist_directory=db_path_str,
             embedding_function=embeddings
         )
         vectorstore.add_documents(resource_docs)
@@ -305,7 +306,7 @@ def embed_resources():
         vectorstore = Chroma.from_documents(
             documents=resource_docs,
             embedding=embeddings,
-            persist_directory=config.retriever.db_path
+            persist_directory=db_path_str
         )
         print(f"✅ Created new vector store with {len(resource_docs)} resource documents")
 
@@ -314,11 +315,15 @@ def embed_resources():
 if __name__ == "__main__":
     print("🚀 Starting data ingestion process...")
     print(f"Configuration loaded from config.yaml")
+    print(f"Project: {config.project.name}")
+    print(f"Data directory: {config.get_data_dir()}")
+
+    docs_output_dir = config.get_docs_output_dir()
 
     # Process all git repositories
     for repo_url in config.documentation.git_repos:
         print(f"\n📦 Processing repository: {repo_url}")
-        ingest_documentation(repo_url, config.documentation.docs_output_dir)
+        ingest_documentation(repo_url, docs_output_dir)
 
     # Process all local folders
     for local_folder in config.documentation.local_folders:
@@ -330,8 +335,12 @@ if __name__ == "__main__":
             print(f"⚠️  WARNING: Local folder does not exist: {local_folder}")
 
     # Load, chunk, and embed from the built HTML
-    print(f"\n📚 Loading and embedding documentation from: {config.documentation.sphinx_build_html_path}")
-    load_chunk_embed(config.documentation.sphinx_build_html_path)
+    sphinx_path = config.get_sphinx_build_html_path()
+    if sphinx_path and sphinx_path.exists():
+        print(f"\n📚 Loading and embedding documentation from: {sphinx_path}")
+        load_chunk_embed(str(sphinx_path))
+    else:
+        print(f"⚠️  Sphinx build path not configured or does not exist")
 
     # Embed resources from config.yaml
     embed_resources()

@@ -10,30 +10,59 @@ import yaml
 from pydantic import BaseModel, Field
 
 
+class ProjectConfig(BaseModel):
+    """Configuration for project identity and base directories."""
+
+    name: str = Field(
+        default="tomo",
+        description="Project identifier name (used in directory naming)",
+    )
+    data_dir: str = Field(
+        default=".bait-tomo",
+        description="Base directory for all project data",
+    )
+
+
+class StorageConfig(BaseModel):
+    """Configuration for conversation and data storage."""
+
+    conversations_dir: Optional[str] = Field(
+        default=None,
+        description="Directory for conversation storage (defaults to {data_dir}/conversations)",
+    )
+
+
 class DocumentationSourceConfig(BaseModel):
     """Configuration for documentation sources."""
 
     git_repos: List[str] = Field(
-        default_factory=lambda: ["https://github.com/xray-imaging/2bm-docs.git"],
+        default_factory=list,
         description="List of Git repository URLs to clone and index",
     )
     local_folders: List[str] = Field(
         default_factory=list, description="List of local folder paths to index"
     )
-    docs_output_dir: str = Field(
-        default="tomo_documentation",
-        description="Directory where documentation will be stored",
+    docs_output_dir: Optional[str] = Field(
+        default=None,
+        description="Directory where documentation will be stored (defaults to {data_dir}/documentation)",
     )
-    sphinx_build_html_path: str = Field(
-        default="tomo_documentation/2bm-docs/docs/_build/html",
-        description="Path to built Sphinx HTML documentation",
+    sphinx_build_html_path: Optional[str] = Field(
+        default=None,
+        description="Path to built Sphinx HTML documentation (defaults to {data_dir}/documentation/repos/*/docs/_build/html)",
+    )
+    resources: Optional[Dict] = Field(
+        default=None,
+        description="Reference resources (beamlines, software, organizations, etc.)",
     )
 
 
 class RetrieverConfig(BaseModel):
     """Configuration for the document retriever."""
 
-    db_path: str = Field(default="./chroma_db", description="ChromaDB persist directory")
+    db_path: Optional[str] = Field(
+        default=None,
+        description="ChromaDB persist directory (defaults to {data_dir}/chroma_db)",
+    )
     embedding_model: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
         description="HuggingFace embedding model name",
@@ -110,9 +139,8 @@ class ServerConfig(BaseModel):
 class TomoBaitConfig(BaseModel):
     """Main configuration for TomoBait application."""
 
-    # Allow extra fields for custom configuration sections (like 'resources')
-    model_config = {"extra": "allow"}
-
+    project: ProjectConfig = Field(default_factory=ProjectConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
     documentation: DocumentationSourceConfig = Field(
         default_factory=DocumentationSourceConfig
     )
@@ -120,6 +148,42 @@ class TomoBaitConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     text_processing: TextProcessingConfig = Field(default_factory=TextProcessingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
+
+    def get_data_dir(self) -> Path:
+        """Get the resolved data directory path."""
+        return Path(self.project.data_dir)
+
+    def get_conversations_dir(self) -> Path:
+        """Get the resolved conversations directory path."""
+        if self.storage.conversations_dir:
+            return Path(self.storage.conversations_dir)
+        return self.get_data_dir() / "conversations"
+
+    def get_docs_output_dir(self) -> Path:
+        """Get the resolved documentation output directory path."""
+        if self.documentation.docs_output_dir:
+            return Path(self.documentation.docs_output_dir)
+        return self.get_data_dir() / "documentation"
+
+    def get_sphinx_build_html_path(self) -> Optional[Path]:
+        """Get the resolved Sphinx build HTML path."""
+        if self.documentation.sphinx_build_html_path:
+            return Path(self.documentation.sphinx_build_html_path)
+        # Return None - let ingestion discover the path
+        return None
+
+    def get_db_path(self) -> Path:
+        """Get the resolved ChromaDB path."""
+        if self.retriever.db_path:
+            return Path(self.retriever.db_path)
+        return self.get_data_dir() / "chroma_db"
+
+    def ensure_directories(self) -> None:
+        """Create all necessary directories if they don't exist."""
+        self.get_data_dir().mkdir(parents=True, exist_ok=True)
+        self.get_conversations_dir().mkdir(parents=True, exist_ok=True)
+        self.get_docs_output_dir().mkdir(parents=True, exist_ok=True)
+        self.get_db_path().parent.mkdir(parents=True, exist_ok=True)
 
 
 class ConfigManager:
@@ -143,6 +207,9 @@ class ConfigManager:
             # Create default config if file doesn't exist
             self._config = TomoBaitConfig()
             self.save(self._config)
+
+        # Ensure all required directories exist
+        self._config.ensure_directories()
 
         return self._config
 
