@@ -146,36 +146,41 @@ TomoBait uses a centralized `config.yaml` configuration file with hot-reload sup
 ### Configuration Sections
 
 ```yaml
+project:
+  name:                  # Project identifier (used in directory naming)
+  data_dir:              # Base directory for all project data (e.g., .bait-tomo)
+
+storage:
+  conversations_dir:     # Directory for conversation storage (defaults to {data_dir}/conversations)
+
 documentation:
-  git_repos:              # List of Git repository URLs
-  local_folders:          # List of local folder paths
-  docs_output_dir:        # Where to store documentation
-  sphinx_build_html_path: # Path to built Sphinx HTML
+  git_repos:             # List of Git repository URLs
+  local_folders:         # List of local folder paths
+  docs_output_dir:       # Where to store documentation (defaults to {data_dir}/documentation)
+  sphinx_build_html_path: # Path to built Sphinx HTML (auto-detected if null)
+  resources:             # Reference resources (beamlines, software, organizations, etc.)
 
 retriever:
-  db_path:                # ChromaDB storage path
-  embedding_model:        # HuggingFace model name
-  k:                      # Number of documents to retrieve
-  search_type:            # similarity, mmr, or similarity_score_threshold
+  db_path:               # ChromaDB storage path (defaults to {data_dir}/chroma_db)
+  embedding_model:       # HuggingFace model name
+  k:                     # Number of documents to retrieve
+  search_type:           # similarity, mmr, or similarity_score_threshold
 
 llm:
-  api_key_env:           # Environment variable name for API key
-  model:                 # Model name (gemini-2.5-flash, gpt-4, etc.)
-  api_type:              # google, openai, azure, anthropic
-  system_message:        # System prompt for the agent
+  api_key_env:          # Environment variable name for API key
+  model:                # Model name (gemini-2.5-flash, gpt-4, etc.)
+  api_type:             # google, openai, azure, anthropic
+  system_message:       # System prompt for the agent
 
 text_processing:
-  chunk_size:            # Text chunk size (100-5000)
-  chunk_overlap:         # Overlap between chunks (0-1000)
+  chunk_size:           # Text chunk size (100-5000)
+  chunk_overlap:        # Overlap between chunks (0-1000)
 
 server:
-  backend_host:          # Backend server host
-  backend_port:          # Backend server port
-  frontend_host:         # Frontend server host
-  frontend_port:         # Frontend server port
-
-resources:               # Custom resources section
-  # Add any custom configuration here
+  backend_host:         # Backend server host
+  backend_port:         # Backend server port
+  frontend_host:        # Frontend server host
+  frontend_port:        # Frontend server port
 ```
 
 ### Switching LLM Providers
@@ -342,7 +347,8 @@ For detailed development guidance, see [CLAUDE.md](CLAUDE.md).
 - Check firewall settings
 
 ### No documents retrieved
-- Verify ChromaDB path in config.yaml
+- Verify project data directory exists (e.g., `.bait-tomo/`)
+- Check ChromaDB path in config.yaml (defaults to `.bait-tomo/chroma_db`)
 - Re-run ingestion: `pixi run ingest`
 - Check that embedding model matches between ingestion and retrieval
 
