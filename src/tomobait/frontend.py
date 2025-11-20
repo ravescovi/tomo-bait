@@ -177,9 +177,8 @@ def delete_conversation_by_id(conv_id: str):
 
 def load_config_values():
     """
-    Load current config values for the config tab.
+    Load current config values for Configuration tab (technical settings only).
     """
-    import yaml
     config = get_config()
 
     # Determine provider from api_type
@@ -191,6 +190,32 @@ def load_config_values():
         "anl_argo": "anl_argo"
     }
     provider = api_type_to_provider.get(config.llm.api_type, "gemini")
+
+    return (
+        config.retriever.db_path,
+        config.retriever.embedding_model,
+        config.retriever.k,
+        config.retriever.search_type,
+        config.retriever.score_threshold or 0.0,
+        provider,
+        config.llm.api_key_env,
+        config.llm.api_type,
+        config.llm.model,
+        config.llm.system_message,
+        config.llm.anl_api_url or "",
+        config.llm.anl_user or "",
+        config.llm.anl_model or "",
+        config.text_processing.chunk_size,
+        config.text_processing.chunk_overlap,
+    )
+
+
+def load_sources_values():
+    """
+    Load documentation sources values for Sources tab.
+    """
+    import yaml
+    config = get_config()
 
     # Format resources as YAML for display
     config_dict = config.model_dump()
@@ -208,69 +233,40 @@ def load_config_values():
         "\n".join(config.documentation.local_folders),
         config.documentation.docs_output_dir,
         config.documentation.sphinx_build_html_path,
-        config.retriever.db_path,
-        config.retriever.embedding_model,
-        config.retriever.k,
-        config.retriever.search_type,
-        config.retriever.score_threshold or 0.0,
-        provider,  # Add provider
-        config.llm.api_key_env,  # Add api_key_env
-        config.llm.api_type,
-        config.llm.model,
-        config.llm.system_message,
-        config.llm.anl_api_url or "",  # ANL Argo fields
-        config.llm.anl_user or "",
-        config.llm.anl_model or "",
-        config.text_processing.chunk_size,
-        config.text_processing.chunk_overlap,
-        resources_yaml,  # Resources display
+        resources_yaml,
     )
 
 
 def save_config_values(
-    git_repos_str,
-    local_folders_str,
-    docs_output_dir,
-    sphinx_build_html_path,
     db_path,
     embedding_model,
     k,
     search_type,
     score_threshold,
-    provider,  # Add provider (not saved, just for UI)
-    api_key_env,  # Add api_key_env
+    provider,  # Not saved, just for UI
+    api_key_env,
     api_type,
     model,
     system_message,
-    anl_api_url,  # ANL Argo fields
+    anl_api_url,
     anl_user,
     anl_model,
     chunk_size,
     chunk_overlap,
 ):
     """
-    Save config values from the config tab.
+    Save technical config values from the Configuration tab.
     """
     config = get_config()
 
-    # Parse multi-line strings
-    git_repos = [line.strip() for line in git_repos_str.split("\n") if line.strip()]
-    local_folders = [
-        line.strip() for line in local_folders_str.split("\n") if line.strip()
-    ]
-
-    # Update config
-    config.documentation.git_repos = git_repos
-    config.documentation.local_folders = local_folders
-    config.documentation.docs_output_dir = docs_output_dir
-    config.documentation.sphinx_build_html_path = sphinx_build_html_path
-
+    # Update retriever settings
     config.retriever.db_path = db_path
     config.retriever.embedding_model = embedding_model
     config.retriever.k = k
     config.retriever.search_type = search_type
     config.retriever.score_threshold = score_threshold if score_threshold > 0 else None
 
+    # Update LLM settings
     config.llm.api_key_env = api_key_env
     config.llm.model = model
     config.llm.api_type = api_type
@@ -281,8 +277,38 @@ def save_config_values(
     config.llm.anl_user = anl_user if anl_user else None
     config.llm.anl_model = anl_model if anl_model else None
 
+    # Update text processing settings
     config.text_processing.chunk_size = chunk_size
     config.text_processing.chunk_overlap = chunk_overlap
+
+    # Save to file
+    save_config(config)
+
+    return "Configuration saved successfully! Config will hot-reload automatically."
+
+
+def save_sources_values(
+    git_repos_str,
+    local_folders_str,
+    docs_output_dir,
+    sphinx_build_html_path,
+):
+    """
+    Save documentation sources from the Sources tab.
+    """
+    config = get_config()
+
+    # Parse multi-line strings
+    git_repos = [line.strip() for line in git_repos_str.split("\n") if line.strip()]
+    local_folders = [
+        line.strip() for line in local_folders_str.split("\n") if line.strip()
+    ]
+
+    # Update documentation sources
+    config.documentation.git_repos = git_repos
+    config.documentation.local_folders = local_folders
+    config.documentation.docs_output_dir = docs_output_dir
+    config.documentation.sphinx_build_html_path = sphinx_build_html_path
 
     # Save to file
     save_config(config)
@@ -480,26 +506,108 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                 [history_display, delete_status],
             )
 
-        # --- Tab 3: Configuration ---
-        with gr.Tab("Configuration"):
-            gr.Markdown("## Application Configuration")
+        # --- Tab 3: Sources ---
+        with gr.Tab("Sources"):
+            gr.Markdown("## Documentation Sources")
             gr.Markdown(
-                "Edit settings and click Save. **Restart the backend** to apply changes."
+                "Manage documentation sources and run ingestion to update the vector database."
             )
 
             with gr.Accordion("📚 Documentation Sources", open=True):
-                git_repos = gr.Textbox(
+                sources_git_repos = gr.Textbox(
                     label="Git Repositories (one per line)",
                     lines=3,
                     placeholder="https://github.com/user/repo.git",
                 )
-                local_folders = gr.Textbox(
+                sources_local_folders = gr.Textbox(
                     label="Local Folders (one per line)",
                     lines=3,
                     placeholder="/path/to/docs",
                 )
-                docs_output = gr.Textbox(label="Documentation Output Directory")
-                sphinx_html = gr.Textbox(label="Sphinx HTML Build Path")
+                sources_docs_output = gr.Textbox(label="Documentation Output Directory")
+                sources_sphinx_html = gr.Textbox(label="Sphinx HTML Build Path")
+
+            with gr.Accordion("🔄 Vector Database & Ingestion", open=True):
+                sources_ingest_status = gr.Textbox(
+                    label="Vector Database Status",
+                    value="Checking...",
+                    interactive=False,
+                )
+
+                with gr.Row():
+                    save_sources_btn = gr.Button("💾 Save Sources", variant="primary")
+                    reingest_btn = gr.Button("🔄 Re-Ingest", variant="secondary")
+
+                sources_ingest_output = gr.Textbox(
+                    label="Ingestion Log",
+                    interactive=False,
+                    lines=10,
+                    placeholder="Ingestion output will appear here...",
+                )
+
+            with gr.Accordion("📖 Reference Resources", open=False):
+                gr.Markdown(
+                    "These resources from config.yaml are embedded in the vector database. "
+                    "Edit config.yaml directly to modify."
+                )
+                sources_resources_display = gr.Code(
+                    label="Resources Configuration",
+                    language="yaml",
+                    interactive=False,
+                    lines=20,
+                )
+
+            sources_status = gr.Textbox(label="Status", interactive=False)
+
+            # Load sources values on startup
+            demo.load(
+                load_sources_values,
+                None,
+                [
+                    sources_git_repos,
+                    sources_local_folders,
+                    sources_docs_output,
+                    sources_sphinx_html,
+                    sources_resources_display,
+                ],
+            )
+
+            # Load initial ingestion status
+            demo.load(
+                check_vectordb_status,
+                None,
+                sources_ingest_status
+            )
+
+            # Connect save sources button
+            save_sources_btn.click(
+                save_sources_values,
+                [
+                    sources_git_repos,
+                    sources_local_folders,
+                    sources_docs_output,
+                    sources_sphinx_html,
+                ],
+                sources_status,
+            )
+
+            # Connect re-ingest button
+            reingest_btn.click(
+                run_data_ingestion,
+                None,
+                sources_ingest_output
+            ).then(
+                check_vectordb_status,
+                None,
+                sources_ingest_status
+            )
+
+        # --- Tab 4: Configuration ---
+        with gr.Tab("Configuration"):
+            gr.Markdown("## Technical Configuration")
+            gr.Markdown(
+                "Edit RAG and LLM settings. **Restart the backend** to apply changes."
+            )
 
             with gr.Accordion("🔍 Retriever Settings", open=True):
                 db_path = gr.Textbox(label="ChromaDB Path")
@@ -584,37 +692,6 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     label="Chunk Overlap", minimum=0, maximum=1000, step=50
                 )
 
-            with gr.Accordion("📚 Resources (APS Tomography)", open=False):
-                gr.Markdown(
-                    "This section contains links to beamlines, software packages, "
-                    "and community resources. Edit config.yaml directly to modify."
-                )
-                resources_display = gr.Code(
-                    label="Resources Configuration",
-                    language="yaml",
-                    interactive=False,
-                    lines=20,
-                )
-
-            with gr.Accordion("🔄 Data Ingestion", open=True):
-                gr.Markdown(
-                    "Ingest documentation into the vector database. "
-                    "Run this after changing documentation sources or to refresh the index."
-                )
-                with gr.Row():
-                    ingest_status_display = gr.Textbox(
-                        label="Vector Database Status",
-                        value="Checking...",
-                        interactive=False,
-                    )
-                ingest_btn = gr.Button("🚀 Run Data Ingestion", variant="secondary")
-                ingest_output = gr.Textbox(
-                    label="Ingestion Log",
-                    interactive=False,
-                    lines=10,
-                    placeholder="Ingestion output will appear here...",
-                )
-
             save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
             config_status = gr.Textbox(label="Status", interactive=False)
 
@@ -625,15 +702,11 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                 outputs=[llm_model, api_type, api_key_env, anl_settings],
             )
 
-            # Load current config values on startup
+            # Load current config values on startup for Configuration tab
             demo.load(
                 load_config_values,
                 None,
                 [
-                    git_repos,
-                    local_folders,
-                    docs_output,
-                    sphinx_html,
                     db_path,
                     embedding_model,
                     k_value,
@@ -649,7 +722,6 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     anl_model,
                     chunk_size,
                     chunk_overlap,
-                    resources_display,
                 ],
             )
 
@@ -657,10 +729,6 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
             save_cfg_btn.click(
                 save_config_values,
                 [
-                    git_repos,
-                    local_folders,
-                    docs_output,
-                    sphinx_html,
                     db_path,
                     embedding_model,
                     k_value,
@@ -678,24 +746,6 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue")) as demo:
                     chunk_overlap,
                 ],
                 config_status,
-            )
-
-            # Connect ingestion button
-            ingest_btn.click(
-                run_data_ingestion,
-                None,
-                ingest_output
-            ).then(
-                check_vectordb_status,
-                None,
-                ingest_status_display
-            )
-
-            # Load initial ingestion status
-            demo.load(
-                check_vectordb_status,
-                None,
-                ingest_status_display
             )
 
         # --- Tab 4: Setup (AI Config Generator) ---
