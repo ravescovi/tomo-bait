@@ -37,6 +37,7 @@ dependencies = [
     "sphinxcontrib-bibtex>=2.6.5,<3",
     "nbsphinx>=0.9.7,<0.10",
     "pybtex>=0.25.1,<0.26",
+    "openai>=2.9.0",
 ]
 
 [project.optional-dependencies]
