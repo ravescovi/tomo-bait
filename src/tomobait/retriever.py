@@ -1,20 +1,21 @@
 import sys
 
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 
 from .config import get_config
+from .embeddings import get_embeddings
 
 # Load configuration
 config = get_config()
+
 
 def get_documentation_retriever():
     """
     Initializes and returns a retriever for our ChromaDB.
     """
-    print(f"Loading embedding model: {config.retriever.embedding_model}")
-    # Initialize the same embedding model
-    embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+    print("Loading embedding model...")
+    # Initialize embeddings using configured provider and device
+    embeddings = get_embeddings()
 
     db_path = str(config.get_db_path())
     print(f"Connecting to vector store at: {db_path}")
