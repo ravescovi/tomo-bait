@@ -16,7 +16,6 @@ from .config import (
     save_config,
 )
 from .config_generator import config_dict_to_yaml, generate_config_from_prompt
-from .config_watcher import start_config_watcher
 
 load_dotenv()
 
@@ -178,21 +177,10 @@ async def reset_agents_endpoint():
     }
 
 
-# --- Startup Event: Initialize Config Watcher ---
+# --- Startup Event ---
 @api.on_event("startup")
 async def startup_event():
-    """Initialize config file watcher on startup."""
-    def on_config_reload():
-        """Callback for config reload."""
-        print("🔄 Config reloaded in backend")
-        # Reset agents so they pick up new config
-        reset_agents()
-        reload_config()
-
-    # Start watching config file
-    start_config_watcher(callback=on_config_reload)
-    print("✅ Config watcher started")
-
+    """Log startup information."""
     # Log LLM status on startup
     llm_status = get_llm_status()
     if llm_status["available"]:
