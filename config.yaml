@@ -161,6 +161,11 @@ retriever:
   k: 3
   search_type: similarity
   score_threshold: null
+embedding:
+  provider: argo  # 'huggingface' for local or 'argo' for ANL Argo API
+  model: ada002  # For argo: 'ada002'. For huggingface: 'sentence-transformers/all-MiniLM-L6-v2'
+  argo_user: null  # If null, falls back to llm.api_key (your ANL username)
+  argo_base_url: https://apps-dev.inside.anl.gov/argoapi/api/v1/resource/embed/
 llm:
   api_key: ecodrea
   model: gpt4o

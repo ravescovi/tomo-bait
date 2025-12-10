@@ -55,6 +55,27 @@ class DocumentationSourceConfig(BaseModel):
     )
 
 
+class EmbeddingConfig(BaseModel):
+    """Configuration for embedding model."""
+
+    provider: str = Field(
+        default="huggingface",
+        description="Embedding provider: 'huggingface' (local) or 'argo' (ANL Argo API)",
+    )
+    model: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="Model name (HuggingFace model or Argo model like 'ada002')",
+    )
+    argo_user: Optional[str] = Field(
+        default=None,
+        description="ANL username for Argo API (if provider is 'argo')",
+    )
+    argo_base_url: str = Field(
+        default="https://apps-dev.inside.anl.gov/argoapi/api/v1/resource/embed/",
+        description="Base URL for Argo embedding API",
+    )
+
+
 class RetrieverConfig(BaseModel):
     """Configuration for the document retriever."""
 
@@ -64,7 +85,7 @@ class RetrieverConfig(BaseModel):
     )
     embedding_model: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
-        description="HuggingFace embedding model name",
+        description="HuggingFace embedding model name (DEPRECATED: use embedding.model instead)",
     )
     k: int = Field(
         default=3, description="Number of documents to retrieve per query", ge=1, le=20
@@ -138,6 +159,7 @@ class TomoBaitConfig(BaseModel):
         default_factory=DocumentationSourceConfig
     )
     retriever: RetrieverConfig = Field(default_factory=RetrieverConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     text_processing: TextProcessingConfig = Field(default_factory=TextProcessingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

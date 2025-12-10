@@ -12,10 +12,10 @@ from git import Repo
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import ReadTheDocsLoader
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .config import get_config
+from .embeddings import get_embeddings
 
 # Load configuration
 config = get_config()
@@ -96,10 +96,10 @@ def load_chunk_embed(HTML_BUILD_DIR: str):
     docs = loader.load()
 
     if not docs:
-        print("❌ ERROR: No documents were loaded. Check your HTML_BUILD_DIR.")
+        print("ERROR: No documents were loaded. Check your HTML_BUILD_DIR.")
         sys.exit(1)
 
-    print(f"✅ Loaded {len(docs)} documents.")
+    print(f"Loaded {len(docs)} documents.")
 
     # This splitter tries to keep paragraphs/sentences together
     text_splitter = RecursiveCharacterTextSplitter(
@@ -109,13 +109,11 @@ def load_chunk_embed(HTML_BUILD_DIR: str):
 
     print("Splitting documents into chunks...")
     splits = text_splitter.split_documents(docs)
-    print(f"✅ Split {len(docs)} docs into {len(splits)} chunks.")
+    print(f"Split {len(docs)} docs into {len(splits)} chunks.")
 
     print("Initializing embedding model...")
-    # This model will be downloaded and run 100% locally
-    embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+    embeddings = get_embeddings()
 
-    print("✅ Using local, open-source embeddings!")
     db_path = str(config.get_db_path())
     print(f"Creating and saving vector store at {db_path}...")
     # This is the magic command.
@@ -126,7 +124,7 @@ def load_chunk_embed(HTML_BUILD_DIR: str):
         persist_directory=db_path
     )
 
-    print("🎉 All done!")
+    print("All done!")
     print(f"Your knowledge base is ready and saved in '{db_path}'.")
 
 def create_resource_documents() -> List[Document]:
@@ -272,18 +270,18 @@ def embed_resources():
     """
     Embed resource documents from config.yaml into the vector store.
     """
-    print("\n🔧 Processing resources from config.yaml...")
+    print("\nProcessing resources from config.yaml...")
 
     # Create documents from resources
     resource_docs = create_resource_documents()
 
     if not resource_docs:
-        print("⚠️  No resource documents to embed")
+        print("No resource documents to embed")
         return
 
-    # Initialize embeddings
+    # Initialize embeddings using configured provider
     print("Initializing embedding model...")
-    embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+    embeddings = get_embeddings()
 
     # Load existing vectorstore or create new one
     db_path = config.get_db_path()
@@ -298,7 +296,7 @@ def embed_resources():
             embedding_function=embeddings
         )
         vectorstore.add_documents(resource_docs)
-        print(f"✅ Added {len(resource_docs)} resource documents to existing vector store")
+        print(f"Added {len(resource_docs)} resource documents to existing vector store")
     else:
         # Create new vectorstore with resource docs
         vectorstore = Chroma.from_documents(
@@ -306,9 +304,9 @@ def embed_resources():
             embedding=embeddings,
             persist_directory=db_path_str
         )
-        print(f"✅ Created new vector store with {len(resource_docs)} resource documents")
+        print(f"Created new vector store with {len(resource_docs)} resource documents")
 
-    print("🎉 Resources embedded successfully!")
+    print("Resources embedded successfully!")
 
 def main():
     """Main entry point for data ingestion."""
