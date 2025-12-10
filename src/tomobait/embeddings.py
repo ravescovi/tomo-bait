@@ -156,5 +156,12 @@ def get_embeddings() -> Embeddings:
     else:
         # Default to HuggingFace local embeddings
         model_name = embedding_config.model
-        print(f"Using HuggingFace embeddings (model: {model_name})")
-        return HuggingFaceEmbeddings(model_name=model_name)
+        device = embedding_config.device
+
+        # Build model_kwargs for device selection
+        model_kwargs = {}
+        if device != "auto":
+            model_kwargs["device"] = device
+
+        print(f"Using HuggingFace embeddings (model: {model_name}, device: {device})")
+        return HuggingFaceEmbeddings(model_name=model_name, model_kwargs=model_kwargs)

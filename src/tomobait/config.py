@@ -66,6 +66,10 @@ class EmbeddingConfig(BaseModel):
         default="sentence-transformers/all-MiniLM-L6-v2",
         description="Model name (HuggingFace model or Argo model like 'ada002')",
     )
+    device: str = Field(
+        default="cpu",
+        description="Device for local embeddings: 'cpu', 'cuda', 'mps', or 'auto'",
+    )
     argo_user: Optional[str] = Field(
         default=None,
         description="ANL username for Argo API (if provider is 'argo')",

@@ -601,11 +601,11 @@ def check_vectordb_status():
     """
     try:
         from langchain_chroma import Chroma
-        from langchain_huggingface import HuggingFaceEmbeddings
         from .config import get_config
+        from .embeddings import get_embeddings
 
         config = get_config()
-        embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+        embeddings = get_embeddings()
         vectorstore = Chroma(
             persist_directory=str(config.get_db_path()),
             embedding_function=embeddings
@@ -684,9 +684,9 @@ def get_sources_summary():
     # Get vector DB status
     try:
         from langchain_chroma import Chroma
-        from langchain_huggingface import HuggingFaceEmbeddings
+        from .embeddings import get_embeddings
 
-        embeddings = HuggingFaceEmbeddings(model_name=config.retriever.embedding_model)
+        embeddings = get_embeddings()
         vectorstore = Chroma(
             persist_directory=str(config.get_db_path()),
             embedding_function=embeddings
