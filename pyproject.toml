@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "ag2[gemini,mcp]",
+    "ag2[openai, mcp, gemini]",
     "sentence-transformers>=2.7.0",
     "langchain-community>=0.4.1,<0.5",
     "langchain-chroma>=1.0.0,<2",
